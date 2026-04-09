@@ -30,7 +30,6 @@ const ChatPanel = () => {
     };
     setMessages([...messages, newMsg]);
     setInput("");
-    // Fake RISE response
     setTimeout(() => {
       setMessages(prev => [...prev, {
         id: Date.now() + 1,
@@ -42,15 +41,15 @@ const ChatPanel = () => {
   };
 
   return (
-    <div className="w-[320px] shrink-0 bg-white rounded-r-3xl flex flex-col border-l border-rise-border relative overflow-hidden">
+    <div className="w-[320px] shrink-0 bg-card rounded-r-3xl flex flex-col border-l border-border relative overflow-hidden">
       {/* Header gradient */}
-      <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-orange-100/60 to-transparent pointer-events-none" />
-      
+      <div className="absolute top-0 left-0 right-0 h-24 pointer-events-none" style={{ background: "radial-gradient(ellipse at top, hsla(var(--primary) / 0.1), transparent)" }} />
+
       {/* Header */}
       <div className="p-4 flex items-center justify-center relative z-10">
-        <div className="flex items-center gap-2 bg-rise-orange/10 px-4 py-2 rounded-full">
-          <div className="w-2 h-2 rounded-full bg-rise-orange animate-pulse" />
-          <span className="text-rise-orange font-semibold text-sm">RISE AI</span>
+        <div className="flex items-center gap-2 bg-primary/10 px-4 py-2 rounded-full">
+          <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+          <span className="text-primary font-semibold text-sm">RISE AI</span>
         </div>
       </div>
 
@@ -61,37 +60,37 @@ const ChatPanel = () => {
             <div
               className={`max-w-[85%] px-3 py-2 rounded-2xl text-sm whitespace-pre-wrap ${
                 msg.sender === "user"
-                  ? "bg-rise-bg text-rise-text rounded-br-md"
-                  : "bg-white border border-rise-border text-rise-text rounded-bl-md"
+                  ? "bg-muted text-rise-text rounded-br-md"
+                  : "bg-card border border-border text-rise-text rounded-bl-md"
               }`}
               style={msg.sender === "rise" ? { boxShadow: "var(--shadow-card)" } : {}}
             >
               {msg.text}
             </div>
-            <span className="text-[10px] text-rise-muted mt-1 px-1">{msg.time}</span>
+            <span className="text-[10px] text-muted-foreground mt-1 px-1">{msg.time}</span>
           </div>
         ))}
       </div>
 
       {/* Input */}
-      <div className="p-3 border-t border-rise-border">
-        <div className="flex items-center gap-2 bg-rise-bg rounded-full px-4 py-2">
+      <div className="p-3 border-t border-border">
+        <div className="flex items-center gap-2 bg-muted rounded-full px-4 py-2">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
             placeholder="Ask RISE anything..."
-            className="flex-1 bg-transparent text-sm outline-none text-rise-text placeholder:text-rise-muted"
+            className="flex-1 bg-transparent text-sm outline-none text-rise-text placeholder:text-muted-foreground"
           />
-          <button className="text-rise-muted hover:text-rise-text transition-colors">
+          <button className="text-muted-foreground hover:text-rise-text transition-colors">
             <Mic size={16} />
           </button>
           <button
             onClick={handleSend}
-            className="w-8 h-8 rounded-full bg-rise-orange flex items-center justify-center hover:opacity-90 transition-opacity"
+            className="w-8 h-8 rounded-full bg-primary flex items-center justify-center hover:opacity-90 transition-opacity"
           >
-            <Send size={14} className="text-white" />
+            <Send size={14} className="text-primary-foreground" />
           </button>
         </div>
       </div>
