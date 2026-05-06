@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Lock, Check, X, Plus, Edit3, Trash2, GripVertical } from "lucide-react";
+import { useRISEContext } from "@/contexts/RISEContext";
 
 interface Skill {
   id: number;
@@ -30,6 +31,13 @@ const RoadmapPage = () => {
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [newResource, setNewResource] = useState("");
+
+  const { setCurrentPage, setPageData } = useRISEContext();
+
+  useEffect(() => {
+    setCurrentPage('roadmap');
+    setPageData({ skills: skills.map(s => ({ name: s.name, progress: s.progress, status: s.status })) });
+  }, [skills]);
 
   const saveSkills = (s: Skill[]) => { setSkills(s); localStorage.setItem("rise-roadmap", JSON.stringify(s)); };
 

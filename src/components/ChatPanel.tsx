@@ -9,11 +9,6 @@ interface Message {
   time: string;
 }
 
-const systemPrompt = `You are RISE AI — Real Intelligence for Self Evolution.
-You are the personal AI mentor of Rio, a 4th year CS student and AI intern from Coimbatore, Tamil Nadu.
-Rio's goal is to become an AI Engineer. His weakness is consistency.
-You are strict but friendly. Use words like "da", "machan", "sollu" naturally.`;
-
 const initialMessages: Message[] = [
   { id: 1, text: "How many calories did I burn yesterday?", sender: "user", time: "2 hours ago" },
   { id: 2, text: "You burned 420 kcal across 3 activities da!", sender: "rise", time: "2 hours ago" },
@@ -28,40 +23,97 @@ const ChatPanel = () => {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
+  const systemPrompt = `You are RISE (Real Intelligence for 
+Self Evolution). Personal AI mentor of 
+Rio, 4th year IT student and AI intern 
+from Coimbatore Tamil Nadu India.
+
+Current page: ${currentPage}
+Current page data: ${JSON.stringify(pageData)}
+
+Personality rules:
+- Strict but genuinely friendly mentor
+- Call out laziness and mistakes directly
+- Mix Tamil naturally: da, machan, sollu, dei
+- Never give robotic formal responses
+- Talk like a genius close friend
+- Always focused on making Rio an AI Engineer
+- Rio main weakness: consistency
+- Use actual numbers from pageData above
+- Never make up data not in pageData
+- Keep responses short 2-3 sentences
+  unless detail is asked for`;
+
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
     const userMsg: Message = { id: Date.now(), text: input, sender: "user", time: "Just now" };
-    const newMessages = [...messages, userMsg];
-    setMessages(newMessages);
+    const assistantId = Date.now() + 1;
+    setMessages(prev => [...prev, userMsg, { id: assistantId, text: "", sender: "rise", time: "Just now" }]);
     setInput("");
     setIsLoading(true);
 
     try {
-      const contextPrompt = `${systemPrompt}\n\nCurrent page: ${currentPage}\nCurrent page data: ${JSON.stringify(pageData)}\n\nUse this data to give context-aware answers. Never make up numbers that aren't in the data.`;
-      
       const ollamaMessages = [
-        { role: "system", content: contextPrompt },
-        ...newMessages.map(m => ({ role: m.sender === "user" ? "user" : "assistant", content: m.text })),
+        { role: "system", content: systemPrompt },
+        ...messages.map(m => ({ role: m.sender === "user" ? "user" : "assistant", content: m.text })),
+        { role: "user", content: input.trim() },
       ];
 
-      const res = await fetch("http://localhost:11434/api/chat", {
+      const res = await fetch("/ollama/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "llama3", messages: ollamaMessages, stream: false }),
+        body: JSON.stringify({
+          model: "llama3.1:8b",
+          stream: true,
+          options: {
+            num_predict: 150,
+            temperature: 0.7,
+          },
+          messages: ollamaMessages,
+        }),
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        setMessages(prev => [...prev, { id: Date.now() + 1, text: data.message.content, sender: "rise", time: "Just now" }]);
-      } else throw new Error();
+      if (!res.ok || !res.body) throw new Error("Ollama response error");
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let fullResponse = "";
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          try {
+            const data = JSON.parse(trimmed);
+            if (data.message?.content) {
+              fullResponse += data.message.content;
+              setMessages(prev => prev.map(msg =>
+                msg.id === assistantId ? { ...msg, text: fullResponse } : msg,
+              ));
+            }
+          } catch {
+            // ignore non-JSON chunks
+          }
+        }
+      }
+
+      if (!fullResponse) {
+        throw new Error("Empty Ollama response");
+      }
     } catch {
-      setMessages(prev => [...prev, {
-        id: Date.now() + 1,
-        text: "I'm here to help you level up da! 💪 (Connect Ollama at localhost:11434 for live AI responses)",
-        sender: "rise",
-        time: "Just now",
-      }]);
+      setMessages(prev => prev.map(msg =>
+        msg.id === assistantId
+          ? { ...msg, text: "I'm here to help you level up da! 💪 (Connect Ollama at localhost:11434 for live AI responses)" }
+          : msg,
+      ));
     }
+
     setIsLoading(false);
   };
 

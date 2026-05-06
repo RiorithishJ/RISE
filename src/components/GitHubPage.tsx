@@ -78,7 +78,7 @@ const dummyReport: ReviewReport = {
 };
 
 const GitHubPage = () => {
-  const { setPageData } = useRISEContext();
+  const { setCurrentPage, setPageData } = useRISEContext();
   const [view, setView] = useState<"repos" | "review-options" | "review-loading" | "review-report">("repos");
   const [selectedRepo, setSelectedRepo] = useState<string>("");
   const [reviewType, setReviewType] = useState<"full" | "select">("full");
@@ -89,6 +89,7 @@ const GitHubPage = () => {
   const token = localStorage.getItem("rise-github-token");
 
   useEffect(() => {
+    setCurrentPage('github');
     setPageData({
       githubWeekCommits: weekCommits,
       currentStreak,

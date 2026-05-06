@@ -44,7 +44,7 @@ const getPersonalBests = (): Record<string, { value: number; date: string; time?
 const getTodayStr = () => new Date().toISOString().slice(0, 10);
 
 const FitnessPage = () => {
-  const { setPageData } = useRISEContext();
+  const { setCurrentPage, setPageData } = useRISEContext();
   const [logs, setLogs] = useState<FitnessLog[]>(getStoredLogs);
   const [bests, setBests] = useState(getPersonalBests);
   const [logModal, setLogModal] = useState<string | null>(null);
@@ -77,6 +77,7 @@ const FitnessPage = () => {
   const goalPercent = Math.round((goalsHit / activities.length) * 100);
 
   useEffect(() => {
+    setCurrentPage('fitness');
     setPageData({
       fitnessToday: activities.map(a => ({
         name: a.name,

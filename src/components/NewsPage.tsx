@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, ExternalLink, Bookmark, BookmarkCheck, RefreshCw } from "lucide-react";
+import { useRISEContext } from "@/contexts/RISEContext";
 
 const categories = ["All", "LLMs", "Agents", "Research", "Tools", "Open Source", "Industry"];
 
@@ -24,6 +25,13 @@ const NewsPage = () => {
     const saved = localStorage.getItem("rise-news-bookmarks");
     return saved ? JSON.parse(saved) : [];
   });
+
+  const { setCurrentPage, setPageData } = useRISEContext();
+
+  useEffect(() => {
+    setCurrentPage('news');
+    setPageData({ newsItems: newsItems.length, bookmarks: bookmarks.length });
+  }, [bookmarks]);
 
   const toggleBookmark = (id: number) => {
     const updated = bookmarks.includes(id) ? bookmarks.filter(b => b !== id) : [...bookmarks, id];

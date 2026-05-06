@@ -31,7 +31,7 @@ interface Task { id: number; text: string; done: boolean; }
 interface PostIdea { id: number; topic: string; date: string; status: "Planned" | "Posted" | "Skipped"; }
 
 const DashboardPage = ({ onNavigate }: DashboardPageProps) => {
-  const { setPageData } = useRISEContext();
+  const { setCurrentPage, setPageData } = useRISEContext();
   const [linkedinActive, setLinkedinActive] = useState(true);
   const [linkedinPanel, setLinkedinPanel] = useState(false);
   const [notes, setNotes] = useState(() => localStorage.getItem("rise-notes") || "");
@@ -68,6 +68,7 @@ const DashboardPage = ({ onNavigate }: DashboardPageProps) => {
   const deleteIdea = (id: number) => saveIdeas(postIdeas.filter(i => i.id !== id));
 
   useEffect(() => {
+    setCurrentPage('dashboard');
     setPageData({ tasks: tasks.length, tasksDone: doneCount, notes: notes.length > 0 });
   }, [tasks, notes]);
 

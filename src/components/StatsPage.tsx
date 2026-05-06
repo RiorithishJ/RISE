@@ -27,13 +27,14 @@ const getGrade = (pct: number) => pct >= 90 ? "A" : pct >= 80 ? "B+" : pct >= 70
 const getGradeColor = (grade: string) => grade.startsWith("A") ? "text-green-500" : grade.startsWith("B") ? "text-primary" : grade.startsWith("C") ? "text-yellow-500" : "text-red-500";
 
 const StatsPage = () => {
-  const { setPageData } = useRISEContext();
+  const { setCurrentPage, setPageData } = useRISEContext();
   const [period, setPeriod] = useState<"monthly" | "yearly">("monthly");
   const isM = period === "monthly";
 
   const grade = getGrade(overallPct);
 
   useEffect(() => {
+    setCurrentPage('stats');
     setPageData({ weeklyBreakdown, overallPct, grade });
   }, []);
 

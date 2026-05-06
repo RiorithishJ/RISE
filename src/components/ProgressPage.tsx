@@ -8,7 +8,7 @@ interface ProgressPageProps {
 }
 
 const ProgressPage = ({ scrollToSection, onScrollComplete }: ProgressPageProps) => {
-  const { setPageData } = useRISEContext();
+  const { setCurrentPage, setPageData } = useRISEContext();
   const containerRef = useRef<HTMLDivElement>(null);
 
   const [pomTime, setPomTime] = useState(25 * 60);
@@ -31,6 +31,7 @@ const ProgressPage = ({ scrollToSection, onScrollComplete }: ProgressPageProps) 
   }, [scrollToSection, onScrollComplete]);
 
   useEffect(() => {
+    setCurrentPage('progress');
     setPageData({ pomodoroSessions: 3, focusMinutes: 75, breaks: 2 });
   }, []);
 
