@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Dumbbell, X, Trophy, Flame } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { useRISEContext } from "@/contexts/RISEContext";
+import { useDatabaseService } from "@/hooks/useDatabaseService";
 
 interface FitnessLog {
   activity: string;
@@ -27,26 +28,19 @@ const activities: Activity[] = [
 
 const daysOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-const getStoredLogs = (): FitnessLog[] => {
-  const saved = localStorage.getItem("rise-fitness-logs");
-  return saved ? JSON.parse(saved) : [];
-};
-
-const getPersonalBests = (): Record<string, { value: number; date: string; time?: number; timeDate?: string }> => {
-  const saved = localStorage.getItem("rise-fitness-bests");
-  return saved ? JSON.parse(saved) : {
-    "Push Ups": { value: 60, date: "Mar 15" },
-    "Skipping": { value: 600, date: "Mar 20" },
-    "Running": { value: 7, date: "Feb 28", time: 35, timeDate: "Feb 28" },
-  };
+const defaultBests = {
+  "Push Ups": { value: 60, date: "Mar 15" },
+  "Skipping": { value: 600, date: "Mar 20" },
+  "Running": { value: 7, date: "Feb 28", time: 35, timeDate: "Feb 28" },
 };
 
 const getTodayStr = () => new Date().toISOString().slice(0, 10);
 
 const FitnessPage = () => {
   const { setCurrentPage, setPageData } = useRISEContext();
-  const [logs, setLogs] = useState<FitnessLog[]>(getStoredLogs);
-  const [bests, setBests] = useState(getPersonalBests);
+  const db = useDatabaseService();
+  const [logs, setLogs] = useState<FitnessLog[]>([]);
+  const [bests, setBests] = useState<Record<string, { value: number; date: string; time?: number; timeDate?: string }>>(defaultBests);
   const [logModal, setLogModal] = useState<string | null>(null);
   const [logValue, setLogValue] = useState("");
   const [logTime, setLogTime] = useState("");
@@ -77,6 +71,27 @@ const FitnessPage = () => {
   const goalPercent = Math.round((goalsHit / activities.length) * 100);
 
   useEffect(() => {
+    const loadFitnessData = async () => {
+      const [storedLogs, storedBests] = await Promise.all([
+        db.getRecord("fitness_data", "fitness-logs"),
+        db.getRecord("fitness_data", "fitness-bests"),
+      ]);
+
+      if (storedLogs?.items && Array.isArray(storedLogs.items)) {
+        setLogs(storedLogs.items as FitnessLog[]);
+      } else {
+        setLogs([]);
+      }
+
+      if (storedBests?.items && typeof storedBests.items === "object") {
+        setBests(storedBests.items as Record<string, { value: number; date: string; time?: number; timeDate?: string }>);
+      }
+    };
+
+    void loadFitnessData();
+  }, [db]);
+
+  useEffect(() => {
     setCurrentPage('fitness');
     setPageData({
       fitnessToday: activities.map(a => ({
@@ -90,7 +105,7 @@ const FitnessPage = () => {
     });
   }, [logs, bests]);
 
-  const saveLog = () => {
+  const saveLog = async () => {
     if (!logValue || !logModal) return;
     const val = parseFloat(logValue);
     const newLog: FitnessLog = {
@@ -101,7 +116,7 @@ const FitnessPage = () => {
     };
     const newLogs = [...logs, newLog];
     setLogs(newLogs);
-    localStorage.setItem("rise-fitness-logs", JSON.stringify(newLogs));
+    await db.saveRecord("fitness_data", { id: "fitness-logs", items: newLogs, updatedAt: new Date().toISOString() });
 
     // Check personal best
     const currentBest = bests[logModal]?.value || 0;
@@ -112,7 +127,7 @@ const FitnessPage = () => {
         [logModal]: { value: val, date: dateStr, time: logTime ? parseFloat(logTime) : undefined, timeDate: dateStr },
       };
       setBests(newBests);
-      localStorage.setItem("rise-fitness-bests", JSON.stringify(newBests));
+      await db.saveRecord("fitness_data", { id: "fitness-bests", items: newBests, updatedAt: new Date().toISOString() });
       setNewBestMsg(`🎉 New Personal Best for ${logModal}!`);
       setShowConfetti(true);
       setTimeout(() => { setShowConfetti(false); setNewBestMsg(""); }, 3000);

@@ -1,4 +1,4 @@
-import { Home, TrendingUp, Dumbbell, Github, BarChart3, Newspaper, Map, MessageCircle, User, Settings } from "lucide-react";
+import { Home, TrendingUp, Dumbbell, Github, BarChart3, Newspaper, Map, MessageCircle, User, Settings, FileText } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 const navItems = [
@@ -9,6 +9,7 @@ const navItems = [
   { icon: BarChart3, label: "Stats", id: "stats" },
   { icon: Newspaper, label: "News", id: "news" },
   { icon: Map, label: "Roadmap", id: "roadmap" },
+  { icon: FileText, label: "Analyze", id: "analyze" },
   { icon: MessageCircle, label: "Chat", id: "chat" },
   { icon: User, label: "Profile", id: "profile" },
   { icon: Settings, label: "Settings", id: "settings" },
@@ -21,7 +22,7 @@ interface SidebarProps {
 
 const Sidebar = ({ activePage, onNavigate }: SidebarProps) => {
   return (
-    <div className="w-[70px] bg-rise-dark rounded-l-3xl flex flex-col items-center py-6 gap-1 shrink-0">
+    <div className="w-[70px] bg-rise-dark flex flex-col items-center py-6 gap-1 shrink-0 h-full">
       <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center mb-6">
         <span className="text-primary-foreground font-bold text-lg">R</span>
       </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Lock, Check, X, Plus, Edit3, Trash2, GripVertical } from "lucide-react";
 import { useRISEContext } from "@/contexts/RISEContext";
+import { useDatabaseService } from "@/hooks/useDatabaseService";
 
 interface Skill {
   id: number;
@@ -24,10 +25,8 @@ const initialSkills: Skill[] = [
 ];
 
 const RoadmapPage = () => {
-  const [skills, setSkills] = useState<Skill[]>(() => {
-    const saved = localStorage.getItem("rise-roadmap");
-    return saved ? JSON.parse(saved) : initialSkills;
-  });
+  const db = useDatabaseService();
+  const [skills, setSkills] = useState<Skill[]>(initialSkills);
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [newResource, setNewResource] = useState("");
@@ -35,11 +34,25 @@ const RoadmapPage = () => {
   const { setCurrentPage, setPageData } = useRISEContext();
 
   useEffect(() => {
+    const loadSkills = async () => {
+      const saved = await db.getRecord("coding_skills", "roadmap");
+      if (saved?.items && Array.isArray(saved.items)) {
+        setSkills(saved.items as Skill[]);
+      }
+    };
+
+    void loadSkills();
+  }, [db]);
+
+  useEffect(() => {
     setCurrentPage('roadmap');
     setPageData({ skills: skills.map(s => ({ name: s.name, progress: s.progress, status: s.status })) });
   }, [skills]);
 
-  const saveSkills = (s: Skill[]) => { setSkills(s); localStorage.setItem("rise-roadmap", JSON.stringify(s)); };
+  const saveSkills = async (s: Skill[]) => {
+    setSkills(s);
+    await db.saveRecord("coding_skills", { id: "roadmap", items: s, updatedAt: new Date().toISOString() });
+  };
 
   const toggleSubtopic = (skillId: number, idx: number) => {
     const updated = skills.map(s => {
@@ -55,25 +68,25 @@ const RoadmapPage = () => {
 
   const markComplete = (skillId: number) => {
     const updated = skills.map(s => s.id === skillId ? { ...s, status: "completed" as const, progress: 100, subtopics: s.subtopics.map(t => ({ ...t, done: true })) } : s);
-    saveSkills(updated);
+    void saveSkills(updated);
     setSelectedSkill(null);
   };
 
   const addResource = () => {
     if (!newResource.trim() || !selectedSkill) return;
     const updated = skills.map(s => s.id === selectedSkill.id ? { ...s, resources: [...s.resources, newResource] } : s);
-    saveSkills(updated);
+    void saveSkills(updated);
     setSelectedSkill({ ...selectedSkill, resources: [...selectedSkill.resources, newResource] });
     setNewResource("");
   };
 
-  const deleteSkill = (id: number) => saveSkills(skills.filter(s => s.id !== id));
+  const deleteSkill = (id: number) => void saveSkills(skills.filter(s => s.id !== id));
 
   const addSkill = () => {
     const newSkill: Skill = {
       id: Date.now(), name: "New Skill", description: "Description", subtopics: [{ name: "Topic 1", done: false }], status: "locked", progress: 0, resources: [],
     };
-    saveSkills([...skills, newSkill]);
+    void saveSkills([...skills, newSkill]);
   };
 
   const orderedSkills = [...skills].reverse();

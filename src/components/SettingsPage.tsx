@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Volume2, Eye, EyeOff, ExternalLink } from "lucide-react";
+import { personalityEngine } from "@/services/PersonalityEngine";
+import { fineTuner } from "@/services/FineTuner";
 
 const Toggle = ({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) => (
   <button onClick={() => onChange(!value)}
@@ -93,9 +95,49 @@ const SettingsPage = () => {
         <SettingRow label="Clear Chat History"><button className="text-xs bg-red-50 text-red-500 px-3 py-1.5 rounded-lg font-medium hover:bg-red-100">Clear</button></SettingRow>
         <SettingRow label="Clear All Data"><button className="text-xs bg-red-50 text-red-500 px-3 py-1.5 rounded-lg font-medium hover:bg-red-100">Clear All</button></SettingRow>
       </Section>
+
+          {/* RISE Intelligence Patterns */}
+          <Section title="RISE Intelligence">
+            <div className="py-3">
+              <PatternsDisplay />
+            </div>
+          </Section>
     </div>
   );
 };
+
+    const PatternsDisplay = () => {
+      const patterns = personalityEngine.getPatterns();
+      const trainingCount = JSON.parse(localStorage.getItem('rise_training_data') || '[]').length;
+      return (
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <h3 className="font-semibold text-gray-800 mb-4">🧠 RISE Has Learned About You</h3>
+          <div className="space-y-3">
+            <div className="flex justify-between">
+              <span className="text-gray-500 text-sm">Response style preference</span>
+              <span className="text-orange-500 font-medium text-sm capitalize">{patterns.preferredResponseLength}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500 text-sm">Top interests</span>
+              <span className="text-orange-500 font-medium text-sm">{patterns.topTopics.slice(0,3).join(', ')}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500 text-sm">Tamil mix level</span>
+              <span className="text-orange-500 font-medium text-sm">{patterns.tamilUsagePreference > 0.5 ? 'High 🔥' : 'Medium'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500 text-sm">Most active hours</span>
+              <span className="text-orange-500 font-medium text-sm">{patterns.activeHours.slice(0,3).map(h => `${h}:00`).join(', ')}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500 text-sm">Training examples saved</span>
+              <span className="text-orange-500 font-medium text-sm">{trainingCount}</span>
+            </div>
+          </div>
+          <button onClick={() => fineTuner.exportTrainingData()} className="mt-4 w-full py-2 border border-orange-200 text-orange-500 rounded-xl text-sm hover:bg-orange-50 transition-colors">Export Training Data</button>
+        </div>
+      );
+    };
 
 const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <div className="mb-6">

@@ -1,12 +1,21 @@
 import { useState } from "react";
 import { Send, Mic } from "lucide-react";
 import { useRISEContext } from "@/contexts/RISEContext";
+import { getAIResponse, getAIProvider } from "@/services/AIRouter";
+import { personalityEngine } from "@/services/PersonalityEngine";
+import { getTopicConfig } from "@/services/TopicTuner";
+import { fineTuner } from "@/services/FineTuner";
 
 interface Message {
   id: number;
   text: string;
   sender: "user" | "rise";
   time: string;
+  isError?: boolean;
+  aiProvider?: string;
+  userPrompt?: string;
+  topic?: string;
+  isStreaming?: boolean;
 }
 
 const initialMessages: Message[] = [
@@ -19,99 +28,41 @@ const initialMessages: Message[] = [
 
 const ChatPanel = () => {
   const { currentPage, pageData } = useRISEContext();
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const [messages, setMessages] = useState<Message[]>(initialMessages as Message[]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const systemPrompt = `You are RISE (Real Intelligence for 
-Self Evolution). Personal AI mentor of 
-Rio, 4th year IT student and AI intern 
-from Coimbatore Tamil Nadu India.
-
-Current page: ${currentPage}
-Current page data: ${JSON.stringify(pageData)}
-
-Personality rules:
-- Strict but genuinely friendly mentor
-- Call out laziness and mistakes directly
-- Mix Tamil naturally: da, machan, sollu, dei
-- Never give robotic formal responses
-- Talk like a genius close friend
-- Always focused on making Rio an AI Engineer
-- Rio main weakness: consistency
-- Use actual numbers from pageData above
-- Never make up data not in pageData
-- Keep responses short 2-3 sentences
-  unless detail is asked for`;
+  const systemPrompt = personalityEngine.generateAdaptiveSystemPrompt(currentPage, pageData);
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
-    const userMsg: Message = { id: Date.now(), text: input, sender: "user", time: "Just now" };
+    const content = input.trim();
+    const topic = personalityEngine.extractTopics(content)[0] || 'general';
+    const topicConfig = getTopicConfig(content, false);
+
+    const finalPrompt = systemPrompt + "\n" + topicConfig.systemAddition + (fineTuner.getFewShotExamples(topic) || '');
+
+    const provider = topicConfig.useGemini ? 'gemini' : 'local';
+
+    const userMsg: Message = { id: Date.now(), text: content, sender: 'user', time: 'Just now', userPrompt: content };
     const assistantId = Date.now() + 1;
-    setMessages(prev => [...prev, userMsg, { id: assistantId, text: "", sender: "rise", time: "Just now" }]);
-    setInput("");
+    setMessages(prev => [...prev, userMsg, { id: assistantId, text: '', sender: 'rise', time: 'Just now', isStreaming: true, aiProvider: provider, topic }]);
+    setInput('');
     setIsLoading(true);
 
+    let fullResponse = '';
     try {
-      const ollamaMessages = [
-        { role: "system", content: systemPrompt },
-        ...messages.map(m => ({ role: m.sender === "user" ? "user" : "assistant", content: m.text })),
-        { role: "user", content: input.trim() },
-      ];
+      fullResponse = await getAIResponse(content, [], finalPrompt, false, undefined, (chunk) => {
+        setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, text: (m.text || '') + chunk } : m));
+      }, topicConfig.useGemini);
 
-      const res = await fetch("/ollama/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "llama3.1:8b",
-          stream: true,
-          options: {
-            num_predict: 150,
-            temperature: 0.7,
-          },
-          messages: ollamaMessages,
-        }),
-      });
+      setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, isStreaming: false } : m));
 
-      if (!res.ok || !res.body) throw new Error("Ollama response error");
+      personalityEngine.analyzeMessage(content, fullResponse);
+      fineTuner.saveTrainingExample(content, fullResponse, 3, topic);
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let fullResponse = "";
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-          try {
-            const data = JSON.parse(trimmed);
-            if (data.message?.content) {
-              fullResponse += data.message.content;
-              setMessages(prev => prev.map(msg =>
-                msg.id === assistantId ? { ...msg, text: fullResponse } : msg,
-              ));
-            }
-          } catch {
-            // ignore non-JSON chunks
-          }
-        }
-      }
-
-      if (!fullResponse) {
-        throw new Error("Empty Ollama response");
-      }
-    } catch {
-      setMessages(prev => prev.map(msg =>
-        msg.id === assistantId
-          ? { ...msg, text: "I'm here to help you level up da! 💪 (Connect Ollama at localhost:11434 for live AI responses)" }
-          : msg,
-      ));
+    } catch (error: any) {
+      setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, text: `Connection error da. ${provider === 'gemini' ? 'Gemini API issue' : 'Ollama not running'} — machan check and try again.`, isStreaming: false, isError: true } : m));
     }
 
     setIsLoading(false);
@@ -128,13 +79,23 @@ Personality rules:
       </div>
       <div className="flex-1 overflow-y-auto px-4 py-2 space-y-3">
         {messages.map((msg) => (
-          <div key={msg.id} className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}>
+          <div key={msg.id} className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}>
             <div className={`max-w-[85%] px-3 py-2 rounded-2xl text-sm whitespace-pre-wrap ${
-              msg.sender === "user" ? "bg-muted text-rise-text rounded-br-md" : "bg-card border border-border text-rise-text rounded-bl-md"
-            }`} style={msg.sender === "rise" ? { boxShadow: "var(--shadow-card)" } : {}}>
+              msg.sender === 'user' ? 'bg-muted text-rise-text rounded-br-md' : 'bg-card border border-border text-rise-text rounded-bl-md'
+            }`} style={msg.sender === 'rise' ? { boxShadow: 'var(--shadow-card)' } : {}}>
               {msg.text}
             </div>
-            <span className="text-[10px] text-muted-foreground mt-1 px-1">{msg.time}</span>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-[10px] text-muted-foreground px-1">{msg.time}</span>
+              {msg.sender === 'rise' && (
+                <div className="flex items-center gap-2">
+                  <button onClick={() => { fineTuner.saveTrainingExample(msg.userPrompt || '', msg.text, 5, msg.topic || 'general'); }} className="text-gray-400 hover:text-green-500 transition-colors text-sm">👍</button>
+                  <button onClick={() => { fineTuner.saveTrainingExample(msg.userPrompt || '', msg.text, 1, msg.topic || 'general'); }} className="text-gray-400 hover:text-red-500 transition-colors text-sm">👎</button>
+                  <button onClick={() => navigator.clipboard?.writeText(msg.text || '')} className="text-gray-400 hover:text-gray-600 transition-colors text-sm">📋</button>
+                  <span className="text-xs text-gray-300">{msg.aiProvider === 'gemini' ? '✨ Gemini' : '🔒 Local'}</span>
+                </div>
+              )}
+            </div>
           </div>
         ))}
         {isLoading && (
@@ -156,6 +117,19 @@ Personality rules:
             placeholder="Ask RISE anything..."
             className="flex-1 bg-transparent text-sm outline-none text-rise-text placeholder:text-muted-foreground" />
           <button className="text-muted-foreground hover:text-rise-text transition-colors"><Mic size={16} /></button>
+          <button onClick={async () => {
+            try {
+              const res = await fetch('/ollama/api/tags');
+              const data = await res.json();
+              console.log('Ollama connected:', data);
+              alert('Ollama connected! Models: ' + data.models?.map((m: any) => m.name).join(', '));
+            } catch (e: any) {
+              console.error('Ollama failed:', e);
+              alert('Ollama failed: ' + e.message);
+            }
+          }} className="text-muted-foreground hover:text-rise-text transition-colors">
+            Test Ollama
+          </button>
           <button onClick={handleSend} disabled={isLoading}
             className="w-8 h-8 rounded-full bg-primary flex items-center justify-center hover:opacity-90 transition-opacity disabled:opacity-50">
             <Send size={14} className="text-primary-foreground" />

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Search, ExternalLink, Bookmark, BookmarkCheck, RefreshCw } from "lucide-react";
 import { useRISEContext } from "@/contexts/RISEContext";
+import { useDatabaseService } from "@/hooks/useDatabaseService";
 
 const categories = ["All", "LLMs", "Agents", "Research", "Tools", "Open Source", "Industry"];
 
@@ -21,22 +22,31 @@ const NewsPage = () => {
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"all" | "saved">("all");
-  const [bookmarks, setBookmarks] = useState<number[]>(() => {
-    const saved = localStorage.getItem("rise-news-bookmarks");
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [bookmarks, setBookmarks] = useState<number[]>([]);
+  const db = useDatabaseService();
 
   const { setCurrentPage, setPageData } = useRISEContext();
+
+  useEffect(() => {
+    const loadBookmarks = async () => {
+      const saved = await db.getRecord("ai_news_feed", "bookmarks");
+      if (saved?.ids && Array.isArray(saved.ids)) {
+        setBookmarks(saved.ids as number[]);
+      }
+    };
+
+    void loadBookmarks();
+  }, [db]);
 
   useEffect(() => {
     setCurrentPage('news');
     setPageData({ newsItems: newsItems.length, bookmarks: bookmarks.length });
   }, [bookmarks]);
 
-  const toggleBookmark = (id: number) => {
+  const toggleBookmark = async (id: number) => {
     const updated = bookmarks.includes(id) ? bookmarks.filter(b => b !== id) : [...bookmarks, id];
     setBookmarks(updated);
-    localStorage.setItem("rise-news-bookmarks", JSON.stringify(updated));
+    await db.saveRecord("ai_news_feed", { id: "bookmarks", ids: updated, updatedAt: new Date().toISOString() });
   };
 
   const filtered = newsItems.filter(n =>

@@ -92,3 +92,9 @@
 .animate-pulse-ring {
   animation: pulse-ring 2s infinite;
 }
+
+.main-content {
+  width: 100%;
+  min-height: 100vh;
+  padding: 24px 32px;
+}

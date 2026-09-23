@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import { SlidersHorizontal } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import ChatPanel from "@/components/ChatPanel";
 import DashboardPage from "@/components/DashboardPage";
@@ -11,13 +12,22 @@ import RoadmapPage from "@/components/RoadmapPage";
 import ProfilePage from "@/components/ProfilePage";
 import SettingsPage from "@/components/SettingsPage";
 import FullChatPage from "@/components/FullChatPage";
+import AnalyzePage from "@/components/AnalyzePage";
+import ModeSwitcherModal from "@/components/ModeSwitcherModal";
 import { useRISEContext } from "@/contexts/RISEContext";
 
-const Index = () => {
+interface IndexProps {
+  currentMode: "jarvis" | "rise";
+  onModeChange: (mode: "jarvis" | "rise") => void;
+}
+
+const Index = ({ currentMode, onModeChange }: IndexProps) => {
   const { setCurrentPage } = useRISEContext();
   const [activePage, setActivePage] = useState("dashboard");
   const [scrollToSection, setScrollToSection] = useState<string | null>(null);
+  const [isModeSwitcherOpen, setIsModeSwitcherOpen] = useState(false);
 
+  // Keep the active page in context after navigation without triggering a render-phase state update.
   useEffect(() => {
     setCurrentPage(activePage);
   }, [activePage, setCurrentPage]);
@@ -45,16 +55,26 @@ const Index = () => {
     roadmap: <RoadmapPage />,
     profile: <ProfilePage />,
     settings: <SettingsPage />,
+    analyze: <AnalyzePage />,
     chat: <FullChatPage />,
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-6 bg-grain">
-      <div className="w-full max-w-[1400px] h-[calc(100vh-48px)] bg-card rounded-3xl flex overflow-hidden" style={{ boxShadow: "0 4px 40px rgba(0,0,0,0.1)" }}>
+    <div className="min-h-screen bg-background bg-grain">
+      <div className="w-full h-screen bg-card flex overflow-hidden">
         <Sidebar activePage={activePage} onNavigate={handleNavigate} />
-        {pages[activePage] || <DashboardPage onNavigate={navigateToSection} />}
+        <div className="flex-1">
+          <div className="flex justify-end p-4">
+            <button onClick={() => setIsModeSwitcherOpen(true)} className="flex items-center gap-2 rounded-full border border-border bg-background px-3 py-2 text-sm text-rise-text shadow-sm">
+              <SlidersHorizontal size={16} />
+              {currentMode === "jarvis" ? "JARVIS" : "Rise"}
+            </button>
+          </div>
+          {pages[activePage] || <DashboardPage onNavigate={navigateToSection} />}
+        </div>
         {activePage !== "chat" && <ChatPanel />}
       </div>
+      <ModeSwitcherModal isOpen={isModeSwitcherOpen} onClose={() => setIsModeSwitcherOpen(false)} currentMode={currentMode} onModeChange={onModeChange} />
     </div>
   );
 };

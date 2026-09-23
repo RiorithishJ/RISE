@@ -1,19 +1,29 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useDatabaseService } from "@/hooks/useDatabaseService";
 
 const ProfilePage = () => {
-  const [profile, setProfile] = useState(() => {
-    const saved = localStorage.getItem("rise-profile");
-    return saved ? JSON.parse(saved) : {
-      name: "Rio", email: "rio@email.com", location: "Coimbatore, Tamil Nadu", college: "",
-      year: "4th Year", role: "AI Intern", github: "@rio-dev", linkedin: "",
-      goal: "AI Engineer", timeline: "1 year", skillLevel: "Intermediate",
-    };
+  const db = useDatabaseService();
+  const [profile, setProfile] = useState({
+    name: "Rio", email: "rio@email.com", location: "Coimbatore, Tamil Nadu", college: "",
+    year: "4th Year", role: "AI Intern", github: "@rio-dev", linkedin: "",
+    goal: "AI Engineer", timeline: "1 year", skillLevel: "Intermediate",
   });
 
-  const update = (key: string, value: string) => {
+  useEffect(() => {
+    const loadProfile = async () => {
+      const saved = await db.getRecord("user_profile", "profile");
+      if (saved?.data && typeof saved.data === "object") {
+        setProfile(saved.data as typeof profile);
+      }
+    };
+
+    void loadProfile();
+  }, [db]);
+
+  const update = async (key: string, value: string) => {
     const p = { ...profile, [key]: value };
     setProfile(p);
-    localStorage.setItem("rise-profile", JSON.stringify(p));
+    await db.saveRecord("user_profile", { id: "profile", data: p, updatedAt: new Date().toISOString() });
   };
 
   const Field = ({ label, field, placeholder }: { label: string; field: string; placeholder?: string }) => (

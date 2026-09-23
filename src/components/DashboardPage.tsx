@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Dumbbell, Github, Briefcase, Timer, Plus, Pencil, Trash2, Check, X, Lightbulb } from "lucide-react";
 import { useRISEContext } from "@/contexts/RISEContext";
+import { useDatabaseService } from "@/hooks/useDatabaseService";
 
 interface DashboardPageProps {
   onNavigate: (page: string, section?: string) => void;
@@ -32,40 +33,66 @@ interface PostIdea { id: number; topic: string; date: string; status: "Planned" 
 
 const DashboardPage = ({ onNavigate }: DashboardPageProps) => {
   const { setCurrentPage, setPageData } = useRISEContext();
+  const db = useDatabaseService();
   const [linkedinActive, setLinkedinActive] = useState(true);
   const [linkedinPanel, setLinkedinPanel] = useState(false);
-  const [notes, setNotes] = useState(() => localStorage.getItem("rise-notes") || "");
-  const [tasks, setTasks] = useState<Task[]>(() => {
-    const saved = localStorage.getItem("rise-tasks");
-    return saved ? JSON.parse(saved) : [
-      { id: 1, text: "Complete 50 push-ups", done: true },
-      { id: 2, text: "2 Pomodoro sessions on ML", done: true },
-      { id: 3, text: "Push code to GitHub", done: false },
-      { id: 4, text: "Read transformer paper", done: false },
-      { id: 5, text: "LinkedIn post draft", done: true },
-    ];
-  });
+  const [notes, setNotes] = useState("");
+  const [tasks, setTasks] = useState<Task[]>([
+    { id: 1, text: "Complete 50 push-ups", done: true },
+    { id: 2, text: "2 Pomodoro sessions on ML", done: true },
+    { id: 3, text: "Push code to GitHub", done: false },
+    { id: 4, text: "Read transformer paper", done: false },
+    { id: 5, text: "LinkedIn post draft", done: true },
+  ]);
   const [newTask, setNewTask] = useState("");
-  const [postIdeas, setPostIdeas] = useState<PostIdea[]>(() => {
-    const saved = localStorage.getItem("rise-post-ideas");
-    return saved ? JSON.parse(saved) : [
-      { id: 1, topic: "My journey learning transformers", date: "Apr 5", status: "Planned" },
-      { id: 2, topic: "5 things I learned from building RISE", date: "Apr 2", status: "Posted" },
-      { id: 3, topic: "Why every CS student should learn MLOps", date: "Mar 28", status: "Skipped" },
-    ];
-  });
+  const [postIdeas, setPostIdeas] = useState<PostIdea[]>([
+    { id: 1, topic: "My journey learning transformers", date: "Apr 5", status: "Planned" },
+    { id: 2, topic: "5 things I learned from building RISE", date: "Apr 2", status: "Posted" },
+    { id: 3, topic: "Why every CS student should learn MLOps", date: "Mar 28", status: "Skipped" },
+  ]);
   const [newIdea, setNewIdea] = useState("");
 
-  const saveTasks = (t: Task[]) => { setTasks(t); localStorage.setItem("rise-tasks", JSON.stringify(t)); };
-  const saveNotes = (n: string) => { setNotes(n); localStorage.setItem("rise-notes", n); };
-  const toggleTask = (id: number) => saveTasks(tasks.map(t => t.id === id ? { ...t, done: !t.done } : t));
-  const deleteTask = (id: number) => saveTasks(tasks.filter(t => t.id !== id));
-  const addTask = () => { if (!newTask.trim()) return; saveTasks([...tasks, { id: Date.now(), text: newTask, done: false }]); setNewTask(""); };
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      const [storedNotes, storedTasks, storedIdeas] = await Promise.all([
+        db.getRecord("notes_journal", "dashboard-notes"),
+        db.getRecord("checklists", "dashboard-tasks"),
+        db.getRecord("notes_journal", "dashboard-ideas"),
+      ]);
+
+      if (storedNotes?.content && typeof storedNotes.content === "string") {
+        setNotes(storedNotes.content);
+      }
+      if (storedTasks?.items && Array.isArray(storedTasks.items)) {
+        setTasks(storedTasks.items as Task[]);
+      }
+      if (storedIdeas?.items && Array.isArray(storedIdeas.items)) {
+        setPostIdeas(storedIdeas.items as PostIdea[]);
+      }
+    };
+
+    void loadDashboardData();
+  }, [db]);
+
+  const saveTasks = async (t: Task[]) => {
+    setTasks(t);
+    await db.saveRecord("checklists", { id: "dashboard-tasks", items: t, updatedAt: new Date().toISOString() });
+  };
+  const saveNotes = async (n: string) => {
+    setNotes(n);
+    await db.saveRecord("notes_journal", { id: "dashboard-notes", content: n, updatedAt: new Date().toISOString() });
+  };
+  const toggleTask = (id: number) => void saveTasks(tasks.map(t => t.id === id ? { ...t, done: !t.done } : t));
+  const deleteTask = (id: number) => void saveTasks(tasks.filter(t => t.id !== id));
+  const addTask = () => { if (!newTask.trim()) return; void saveTasks([...tasks, { id: Date.now(), text: newTask, done: false }]); setNewTask(""); };
   const doneCount = tasks.filter(t => t.done).length;
 
-  const saveIdeas = (ideas: PostIdea[]) => { setPostIdeas(ideas); localStorage.setItem("rise-post-ideas", JSON.stringify(ideas)); };
-  const addIdea = () => { if (!newIdea.trim()) return; saveIdeas([...postIdeas, { id: Date.now(), topic: newIdea, date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }), status: "Planned" }]); setNewIdea(""); };
-  const deleteIdea = (id: number) => saveIdeas(postIdeas.filter(i => i.id !== id));
+  const saveIdeas = async (ideas: PostIdea[]) => {
+    setPostIdeas(ideas);
+    await db.saveRecord("notes_journal", { id: "dashboard-ideas", items: ideas, updatedAt: new Date().toISOString() });
+  };
+  const addIdea = () => { if (!newIdea.trim()) return; void saveIdeas([...postIdeas, { id: Date.now(), topic: newIdea, date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }), status: "Planned" }]); setNewIdea(""); };
+  const deleteIdea = (id: number) => void saveIdeas(postIdeas.filter(i => i.id !== id));
 
   useEffect(() => {
     setCurrentPage('dashboard');
